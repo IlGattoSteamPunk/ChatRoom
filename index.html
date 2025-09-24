@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ChatRoom - Chat</title>
+  <!-- Fixed: Removed extra spaces -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/feather-icons"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://unpkg.com/aos@2.3.1/dist/aos.js"></script>
+  <link href="https://unpkg.com/aos@2.3.1/dist/aos.css" rel="stylesheet">
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-database-compat.js"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            primary: {
+              50: '#f0f9ff',
+              100: '#e0f2fe',
+              200: '#bae6fd',
+              300: '#7dd3fc',
+              400: '#38bdf8',
+              500: '#0ea5e9',
+              600: '#0284c7',
+              700: '#0369a1',
+              800: '#075985',
+              900: '#0c4a6e',
+            }
+          },
+          fontFamily: {
+            'sans': ['Inter', 'sans-serif']
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    .message-sent { border-radius: 18px 4px 18px 18px; }
+    .message-received { border-radius: 4px 18px 18px 18px; }
+    .scrollbar-hidden::-webkit-scrollbar { display: none; }
+    .scrollbar-hidden { -ms-overflow-style: none; scrollbar-width: none; }
+    .online-dot {
+      width: 10px; height: 10px; background-color: #10B981;
+      border-radius: 50%; position: absolute; bottom: 0; right: 0;
+      border: 2px solid white;
+    }
+  </style>
+</head>
+<body class="bg-gray-50 h-screen flex flex-col">
+  <!-- Header -->
+  <header class="bg-white shadow-sm py-4 px-6 flex items-center justify-between z-10">
+    <div class="flex items-center">
+      <div class="relative">
+        <div class="bg-primary-500 w-12 h-12 rounded-full flex items-center justify-center">
+          <i data-feather="message-circle" class="text-white w-6 h-6"></i>
+        </div>
+        <div class="online-dot"></div>
+      </div>
+      <div class="ml-4">
+        <h1 class="font-bold text-lg text-gray-800">General Chat</h1>
+        <p class="text-sm text-gray-500">Public room</p>
+      </div>
+    </div>
+  </header>
+
+  <!-- Chat Messages -->
+  <div class="flex-1 overflow-y-auto p-4 pb-20 scrollbar-hidden" id="chat-container">
+    <div class="max-w-3xl mx-auto space-y-4" id="messages-list">
+      <!-- Messages will appear here -->
+    </div>
+  </div>
+
+  <!-- Message Input -->
+  <div class="bg-white border-t border-gray-200 py-4 px-6">
+    <div class="max-w-3xl mx-auto flex items-center">
+      <div class="flex-1 mx-3">
+        <input type="text" id="message-input" class="w-full px-4 py-3 bg-gray-100 rounded-full focus:outline-none focus:ring-2 focus:ring-primary-500 focus:bg-white" placeholder="Type a message...">
+      </div>
+      <button id="send-button" class="ml-2 p-3 bg-primary-500 text-white rounded-full hover:bg-primary-600 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2">
+        <i data-feather="send" class="w-5 h-5"></i>
+      </button>
+    </div>
+  </div>
+
+  <script>
+    // === STEP 1: Get or set username ===
+    let username = localStorage.getItem('chat-username');
+    if (!username) {
+      username = prompt("Enter your name:") || `User${Math.floor(Math.random() * 1000)}`;
+      localStorage.setItem('chat-username', username);
+    }
+
+    // === STEP 2: Firebase config (FIXED: no extra space!) ===
+    const firebaseConfig = {
+      apiKey: "AIzaSyAitQcA61QgbFl_4YEu4-K9wqKnpla853A",
+      authDomain: "antiprivacychatroom.firebaseapp.com",
+      databaseURL: "https://antiprivacychatroom-default-rtdb.europe-west1.firebasedatabase.app", // ✅ no space!
+      projectId: "antiprivacychatroom",
+      storageBucket: "antiprivacychatroom.firebasestorage.app",
+      messagingSenderId: "419150429129",
+      appId: "1:419150429129:web:20bab378f06ed3028f0618"
+    };
+
+    // Initialize Firebase
+    firebase.initializeApp(firebaseConfig);
+    const database = firebase.database();
+    const messagesRef = database.ref('messages');
+
+    // Initialize icons
+    feather.replace();
+    AOS.init({ duration: 400 });
+
+    // DOM elements
+    const chatContainer = document.getElementById('chat-container');
+    const messagesList = document.getElementById('messages-list');
+    const messageInput = document.getElementById('message-input');
+    const sendButton = document.getElementById('send-button');
+
+    // Add message to UI
+    function addMessageToUI(data, key) {
+      const isOwn = data.username === username;
+      const displayName = isOwn ? 'You' : data.username;
+
+      const messageDiv = document.createElement('div');
+      messageDiv.className = isOwn ? 'flex justify-end' : 'flex items-start';
+      messageDiv.setAttribute('data-aos', 'fade-up');
+
+      const time = new Date(data.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+      messageDiv.innerHTML = isOwn
+        ? `
+          <div class="mr-3 text-right">
+            <div class="flex items-baseline justify-end">
+              <span class="mr-2 text-xs text-gray-500">${time}</span>
+              <h4 class="font-semibold text-gray-800">${displayName}</h4>
+            </div>
+            <div class="mt-1 bg-primary-500 text-white p-3 message-sent">
+              <p>${data.text}</p>
+            </div>
+          </div>
+          <img src="http://static.photos/people/200x200/${Math.floor(Math.random() * 100)}" alt="You" class="w-10 h-10 rounded-full object-cover">
+        `
+        : `
+          <div class="relative">
+            <img src="http://static.photos/people/200x200/${Math.floor(Math.random() * 100)}" alt="${displayName}" class="w-10 h-10 rounded-full object-cover">
+          </div>
+          <div class="ml-3">
+            <div class="flex items-baseline">
+              <h4 class="font-semibold text-gray-800">${displayName}</h4>
+              <span class="ml-2 text-xs text-gray-500">${time}</span>
+            </div>
+            <div class="mt-1 bg-white p-3 message-received shadow-sm">
+              <p class="text-gray-800">${data.text}</p>
+            </div>
+          </div>
+        `;
+
+      messagesList.appendChild(messageDiv);
+      AOS.refresh();
+      chatContainer.scrollTop = chatContainer.scrollHeight;
+    }
+
+    // Send message
+    function sendMessage() {
+      const text = messageInput.value.trim();
+      if (text) {
+        messagesRef.push({
+          text: text,
+          username: username,
+          timestamp: firebase.database.ServerValue.TIMESTAMP
+        });
+        messageInput.value = '';
+      }
+    }
+
+    // Event listeners
+    sendButton.addEventListener('click', sendMessage);
+    messageInput.addEventListener('keypress', e => {
+      if (e.key === 'Enter') sendMessage();
+    });
+
+    // Listen for new messages
+    messagesRef.limitToLast(50).on('child_added', snapshot => {
+      const data = snapshot.val();
+      addMessageToUI(data, snapshot.key);
+    });
+  </script>
+</body>
+</html>
