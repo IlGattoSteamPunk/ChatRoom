@@ -3,14 +3,12 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>ChatRoom - Secret Chat</title>
-  <!-- Fixed: NO extra spaces -->
+  <title>Secret Chat</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/feather-icons"></script>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <script src="https://unpkg.com/aos@2.3.1/dist/aos.js"></script>
   <link href="https://unpkg.com/aos@2.3.1/dist/aos.css" rel="stylesheet">
-  <!-- Firebase SDK -->
   <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-database-compat.js"></script>
   <script>
@@ -18,22 +16,9 @@
       theme: {
         extend: {
           colors: {
-            primary: {
-              50: '#f0f9ff',
-              100: '#e0f2fe',
-              200: '#bae6fd',
-              300: '#7dd3fc',
-              400: '#38bdf8',
-              500: '#0ea5e9',
-              600: '#0284c7',
-              700: '#0369a1',
-              800: '#075985',
-              900: '#0c4a6e',
-            }
+            primary: { 500: '#0ea5e9', 600: '#0284c7' }
           },
-          fontFamily: {
-            'sans': ['Inter', 'sans-serif']
-          }
+          fontFamily: { sans: ['Inter', 'sans-serif'] }
         }
       }
     }
@@ -43,11 +28,6 @@
     .message-received { border-radius: 4px 18px 18px 18px; }
     .scrollbar-hidden::-webkit-scrollbar { display: none; }
     .scrollbar-hidden { -ms-overflow-style: none; scrollbar-width: none; }
-    .online-dot {
-      width: 10px; height: 10px; background-color: #10B981;
-      border-radius: 50%; position: absolute; bottom: 0; right: 0;
-      border: 2px solid white;
-    }
     .forbidden-hint {
       animation: pulse 2s infinite;
     }
@@ -58,43 +38,33 @@
   </style>
 </head>
 <body class="bg-gray-50 h-screen flex flex-col">
-  <!-- Header -->
-  <header class="bg-white shadow-sm py-4 px-6 flex items-center justify-between z-10">
+  <header class="bg-white shadow-sm py-4 px-6 flex items-center">
     <div class="flex items-center">
-      <div class="relative">
-        <div class="bg-primary-500 w-12 h-12 rounded-full flex items-center justify-center">
-          <i data-feather="message-circle" class="text-white w-6 h-6"></i>
-        </div>
-        <div class="online-dot"></div>
+      <div class="bg-primary-500 w-10 h-10 rounded-full flex items-center justify-center">
+        <i data-feather="lock" class="text-white w-5 h-5"></i>
       </div>
-      <div class="ml-4">
-        <h1 class="font-bold text-lg text-gray-800">Secret Chat</h1>
-        <p class="text-sm text-gray-500">FORBIDDEN LANGUAGE ONLY</p>
+      <div class="ml-3">
+        <h1 class="font-bold text-lg text-gray-800">FORBIDDEN CHAT</h1>
+        <p class="text-xs text-gray-500">Messages are encoded before sending</p>
       </div>
     </div>
   </header>
 
-  <!-- Chat Messages -->
   <div class="flex-1 overflow-y-auto p-4 pb-20 scrollbar-hidden" id="chat-container">
-    <div class="max-w-3xl mx-auto space-y-4" id="messages-list">
-      <!-- Messages appear here -->
-    </div>
+    <div class="max-w-3xl mx-auto space-y-4" id="messages-list"></div>
   </div>
 
-  <!-- Message Input -->
   <div class="bg-white border-t border-gray-200 py-4 px-6">
     <div class="max-w-3xl mx-auto flex items-center">
-      <div class="flex-1 mx-3">
-        <input type="text" id="message-input" class="forbidden-hint w-full px-4 py-3 bg-gray-100 rounded-full focus:outline-none focus:ring-2 focus:ring-primary-500 focus:bg-white" placeholder="Translate in the FORBIDDEN LANGUAGE..." />
-      </div>
-      <button id="send-button" class="ml-2 p-3 bg-primary-500 text-white rounded-full hover:bg-primary-600 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2">
+      <input type="text" id="message-input" class="forbidden-hint w-full px-4 py-3 bg-gray-100 rounded-full focus:outline-none focus:ring-2 focus:ring-primary-500" placeholder="Type in plain text → auto-encoded in FORBIDDEN LANGUAGE" />
+      <button id="send-button" class="ml-2 p-3 bg-primary-500 text-white rounded-full hover:bg-primary-600">
         <i data-feather="send" class="w-5 h-5"></i>
       </button>
     </div>
   </div>
 
   <script>
-    // === STEP 1: Define your SECRET CIPHER (change this to your real one!) ===
+    // 🔐 YOUR SECRET CIPHER (CHANGE THIS TO YOUR OWN!)
     const CIPHER = {
       'a': 'x', 'b': 'q', 'c': 'w', 'd': 'e', 'e': 'r',
       'f': 't', 'g': 'y', 'h': 'u', 'i': 'i', 'j': 'o',
@@ -103,7 +73,6 @@
       'u': 'z', 'v': 'v', 'w': 'b', 'x': 'n', 'y': 'm', 'z': 'c'
     };
 
-    // Reverse for decoding
     const DECODE = {};
     Object.keys(CIPHER).forEach(k => DECODE[CIPHER[k]] = k);
 
@@ -111,7 +80,7 @@
       return text.toLowerCase().split('').map(char => {
         if (CIPHER[char]) return CIPHER[char];
         if (char === ' ') return ' ';
-        return char;
+        return char; // keep numbers, punctuation
       }).join('');
     }
 
@@ -123,14 +92,14 @@
       }).join('');
     }
 
-    // === STEP 2: Get username ===
-    let username = localStorage.getItem('chat-username');
+    // Get username
+    let username = localStorage.getItem('secret-username');
     if (!username) {
-      username = prompt("Enter your secret name:") || `User${Math.floor(Math.random() * 1000)}`;
-      localStorage.setItem('chat-username', username);
+      username = prompt("Enter your alias:") || `User${Math.floor(Math.random() * 1000)}`;
+      localStorage.setItem('secret-username', username);
     }
 
-    // === STEP 3: Firebase config (YOUR CONFIG - NO SPACES!) ===
+    // 🔥 YOUR FIREBASE CONFIG (already set)
     const firebaseConfig = {
       apiKey: "AIzaSyAitQcA61QgbFl_4YEu4-K9wqKnpla853A",
       authDomain: "antiprivacychatroom.firebaseapp.com",
@@ -141,38 +110,32 @@
       appId: "1:419150429129:web:20bab378f06ed3028f0618"
     };
 
-    // Initialize Firebase
     firebase.initializeApp(firebaseConfig);
-    const database = firebase.database();
-    const messagesRef = database.ref('messages');
+    const db = firebase.database();
+    const messagesRef = db.ref('messages');
 
-    // Initialize icons
     feather.replace();
     AOS.init({ duration: 400 });
 
-    // DOM
     const chatContainer = document.getElementById('chat-container');
     const messagesList = document.getElementById('messages-list');
     const messageInput = document.getElementById('message-input');
     const sendButton = document.getElementById('send-button');
 
-    // Add message to UI
     function addMessageToUI(data) {
       const isOwn = data.username === username;
       const displayName = isOwn ? 'You' : data.username;
       const time = new Date(data.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
-      const messageDiv = document.createElement('div');
-      messageDiv.className = isOwn ? 'flex justify-end mb-4' : 'flex items-start mb-4';
+      const msgDiv = document.createElement('div');
+      msgDiv.className = isOwn ? 'flex justify-end mb-3' : 'flex items-start mb-3';
 
-      // Bubble
       const bubble = document.createElement('div');
       bubble.className = isOwn 
         ? 'bg-primary-500 text-white p-3 message-sent rounded-lg max-w-xs'
         : 'bg-white p-3 message-received shadow-sm rounded-lg max-w-xs';
-      bubble.textContent = data.text;
+      bubble.textContent = data.text; // This is the ENCODED text
 
-      // Translate button
       const translateBtn = document.createElement('button');
       translateBtn.className = 'mt-1 text-xs text-blue-500 hover:underline';
       translateBtn.textContent = 'Translate';
@@ -185,42 +148,38 @@
         };
       };
 
-      // Content wrapper
       const content = document.createElement('div');
-      content.className = isOwn ? 'mr-3 text-right' : 'ml-3';
-      content.innerHTML = `
-        <div class="flex items-baseline ${isOwn ? 'justify-end' : ''}">
-          <h4 class="font-semibold text-gray-800">${displayName}</h4>
-          <span class="ml-2 text-xs text-gray-500">${time}</span>
-        </div>
-      `;
+      content.className = isOwn ? 'mr-2 text-right' : 'ml-2';
+      content.innerHTML = `<div class="flex items-baseline ${isOwn ? 'justify-end' : ''}">
+        <span class="font-medium text-gray-800">${displayName}</span>
+        <span class="ml-2 text-xs text-gray-500">${time}</span>
+      </div>`;
       content.appendChild(bubble);
       content.appendChild(translateBtn);
 
-      // Avatar
       const avatar = document.createElement('img');
-      avatar.src = `http://static.photos/people/200x200/${Math.floor(Math.random() * 100)}`;
+      avatar.src = `https://static.photos/people/200x200/${Math.floor(Math.random() * 100)}`;
       avatar.className = 'w-8 h-8 rounded-full object-cover';
 
       if (isOwn) {
-        messageDiv.appendChild(content);
-        messageDiv.appendChild(avatar);
+        msgDiv.appendChild(content);
+        msgDiv.appendChild(avatar);
       } else {
-        messageDiv.appendChild(avatar);
-        messageDiv.appendChild(content);
+        msgDiv.appendChild(avatar);
+        msgDiv.appendChild(content);
       }
 
-      messagesList.appendChild(messageDiv);
+      messagesList.appendChild(msgDiv);
       chatContainer.scrollTop = chatContainer.scrollHeight;
     }
 
-    // Send message
     function sendMessage() {
-      const text = messageInput.value.trim();
-      if (text) {
-        const encoded = encode(text);
+      const plainText = messageInput.value.trim();
+      if (plainText) {
+        // 🔒 ENCODE BEFORE SENDING — plainText is NEVER stored or sent
+        const encodedText = encode(plainText);
         messagesRef.push({
-          text: encoded,
+          text: encodedText,        // ← ONLY encoded text goes to Firebase
           username: username,
           timestamp: firebase.database.ServerValue.TIMESTAMP
         });
@@ -228,13 +187,11 @@
       }
     }
 
-    // Events
     sendButton.addEventListener('click', sendMessage);
     messageInput.addEventListener('keypress', e => {
       if (e.key === 'Enter') sendMessage();
     });
 
-    // Listen for messages
     messagesRef.limitToLast(50).on('child_added', snapshot => {
       addMessageToUI(snapshot.val());
     });
