@@ -86,123 +86,108 @@
     </div>
   </div>
 
-<script>
-  // === STEP 1: Get or set username ===
-  let username = localStorage.getItem('chat-username');
-  if (!username) {
-    username = prompt("Enter your name:") || `User${Math.floor(Math.random() * 1000)}`;
-    localStorage.setItem('chat-username', username);
-  }
-
-  // === STEP 2: Firebase config ===
-  const firebaseConfig = {
-    apiKey: "AIzaSyAitQcA61QgbFl_4YEu4-K9wqKnpla853A",
-    authDomain: "antiprivacychatroom.firebaseapp.com",
-    databaseURL: "https://antiprivacychatroom-default-rtdb.europe-west1.firebasedatabase.app",
-    projectId: "antiprivacychatroom",
-    storageBucket: "antiprivacychatroom.firebasestorage.app",
-    messagingSenderId: "419150429129",
-    appId: "1:419150429129:web:20bab378f06ed3028f0618"
-  };
-
-  firebase.initializeApp(firebaseConfig);
-  const database = firebase.database();
-  const messagesRef = database.ref('messages');
-
-  // Initialize icons
-  feather.replace();
-  AOS.init({ duration: 400 });
-
-  // DOM elements
-  const messagesList = document.getElementById('messages-list');
-  const messageInput = document.getElementById('message-input');
-  const sendButton = document.getElementById('send-button');
-
-  // Auto-delete after 10 messages (silent)
-  const MAX_MESSAGES = 10;
-  let messageCount = 0;
-
-  // Add message to UI
-  function addMessageToUI(data) {
-    const isOwn = data.username === username;
-    const displayName = isOwn ? 'You' : data.username;
-    const time = new Date(data.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-
-    const messageDiv = document.createElement('div');
-    messageDiv.className = isOwn ? 'flex justify-end' : 'flex items-start';
-    messageDiv.setAttribute('data-aos', 'fade-up');
-
-    messageDiv.innerHTML = isOwn
-      ? `
-        <div class="mr-3 text-right">
-          <div class="flex items-baseline justify-end">
-            <span class="mr-2 text-xs text-gray-500">${time}</span>
-            <h4 class="font-semibold text-gray-800">${displayName}</h4>
-          </div>
-          <div class="mt-1 bg-primary-500 text-white p-3 message-sent">
-            <p>${data.text}</p>
-          </div>
-        </div>
-        <img src="http://static.photos/people/200x200/${Math.floor(Math.random() * 100)}" alt="You" class="w-10 h-10 rounded-full object-cover">
-      `
-      : `
-        <div class="relative">
-          <img src="http://static.photos/people/200x200/${Math.floor(Math.random() * 100)}" alt="${displayName}" class="w-10 h-10 rounded-full object-cover">
-        </div>
-        <div class="ml-3">
-          <div class="flex items-baseline">
-            <h4 class="font-semibold text-gray-800">${displayName}</h4>
-            <span class="ml-2 text-xs text-gray-500">${time}</span>
-          </div>
-          <div class="mt-1 bg-white p-3 message-received shadow-sm">
-            <p class="text-gray-800">${data.text}</p>
-          </div>
-        </div>
-      `;
-
-    messagesList.appendChild(messageDiv);
-    AOS.refresh();
-    document.getElementById('chat-container').scrollTop = document.getElementById('chat-container').scrollHeight;
-  }
-
-  // Send message
-  function sendMessage() {
-    const text = messageInput.value.trim();
-    if (text) {
-      messagesRef.push({
-        text: text,
-        username: username,
-        timestamp: firebase.database.ServerValue.TIMESTAMP
-      });
-      messageInput.value = '';
+  <script>
+    // === STEP 1: Get or set username ===
+    let username = localStorage.getItem('chat-username');
+    if (!username) {
+      username = prompt("Enter your name:") || `User${Math.floor(Math.random() * 1000)}`;
+      localStorage.setItem('chat-username', username);
     }
-  }
 
-  // Event listeners
-  sendButton.addEventListener('click', sendMessage);
-  messageInput.addEventListener('keypress', e => {
-    if (e.key === 'Enter') sendMessage();
-  });
+    // === STEP 2: Firebase config (FIXED: no extra space!) ===
+    const firebaseConfig = {
+      apiKey: "AIzaSyAitQcA61QgbFl_4YEu4-K9wqKnpla853A",
+      authDomain: "antiprivacychatroom.firebaseapp.com",
+      databaseURL: "https://antiprivacychatroom-default-rtdb.europe-west1.firebasedatabase.app", // ✅ no space!
+      projectId: "antiprivacychatroom",
+      storageBucket: "antiprivacychatroom.firebasestorage.app",
+      messagingSenderId: "419150429129",
+      appId: "1:419150429129:web:20bab378f06ed3028f0618"
+    };
 
-  // Listen for new messages
-  messagesRef.limitToLast(50).on('child_added', snapshot => {
-    addMessageToUI(snapshot.val());
-    messageCount++;
+    // Initialize Firebase
+    firebase.initializeApp(firebaseConfig);
+    const database = firebase.database();
+    const messagesRef = database.ref('messages');
 
-    // Silent auto-delete after 10 messages
-    if (messageCount >= MAX_MESSAGES) {
-      messagesRef.remove(); // Only delete from DB — UI stays
-      messageCount = 0; // Reset counter
+    // Initialize icons
+    feather.replace();
+    AOS.init({ duration: 400 });
+
+    // DOM elements
+    const chatContainer = document.getElementById('chat-container');
+    const messagesList = document.getElementById('messages-list');
+    const messageInput = document.getElementById('message-input');
+    const sendButton = document.getElementById('send-button');
+
+    // Add message to UI
+    function addMessageToUI(data, key) {
+      const isOwn = data.username === username;
+      const displayName = isOwn ? 'You' : data.username;
+
+      const messageDiv = document.createElement('div');
+      messageDiv.className = isOwn ? 'flex justify-end' : 'flex items-start';
+      messageDiv.setAttribute('data-aos', 'fade-up');
+
+      const time = new Date(data.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+      messageDiv.innerHTML = isOwn
+        ? `
+          <div class="mr-3 text-right">
+            <div class="flex items-baseline justify-end">
+              <span class="mr-2 text-xs text-gray-500">${time}</span>
+              <h4 class="font-semibold text-gray-800">${displayName}</h4>
+            </div>
+            <div class="mt-1 bg-primary-500 text-white p-3 message-sent">
+              <p>${data.text}</p>
+            </div>
+          </div>
+          <img src="http://static.photos/people/200x200/${Math.floor(Math.random() * 100)}" alt="You" class="w-10 h-10 rounded-full object-cover">
+        `
+        : `
+          <div class="relative">
+            <img src="http://static.photos/people/200x200/${Math.floor(Math.random() * 100)}" alt="${displayName}" class="w-10 h-10 rounded-full object-cover">
+          </div>
+          <div class="ml-3">
+            <div class="flex items-baseline">
+              <h4 class="font-semibold text-gray-800">${displayName}</h4>
+              <span class="ml-2 text-xs text-gray-500">${time}</span>
+            </div>
+            <div class="mt-1 bg-white p-3 message-received shadow-sm">
+              <p class="text-gray-800">${data.text}</p>
+            </div>
+          </div>
+        `;
+
+      messagesList.appendChild(messageDiv);
+      AOS.refresh();
+      chatContainer.scrollTop = chatContainer.scrollHeight;
     }
-  });
 
-  // Optional: clear UI if someone else clears the DB
-  messagesRef.on('value', snapshot => {
-    if (!snapshot.exists()) {
-      // Don't clear UI — just reset counter
-      messageCount = 0;
+    // Send message
+    function sendMessage() {
+      const text = messageInput.value.trim();
+      if (text) {
+        messagesRef.push({
+          text: text,
+          username: username,
+          timestamp: firebase.database.ServerValue.TIMESTAMP
+        });
+        messageInput.value = '';
+      }
     }
-  });
-</script>
+
+    // Event listeners
+    sendButton.addEventListener('click', sendMessage);
+    messageInput.addEventListener('keypress', e => {
+      if (e.key === 'Enter') sendMessage();
+    });
+
+    // Listen for new messages
+    messagesRef.limitToLast(50).on('child_added', snapshot => {
+      const data = snapshot.val();
+      addMessageToUI(data, snapshot.key);
+    });
+  </script>
 </body>
 </html>
