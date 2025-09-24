@@ -114,18 +114,16 @@
   AOS.init({ duration: 400 });
 
   // DOM elements
-  const chatContainer = document.getElementById('chat-container');
   const messagesList = document.getElementById('messages-list');
   const messageInput = document.getElementById('message-input');
   const sendButton = document.getElementById('send-button');
 
-  // Auto-delete config
+  // Auto-delete after 10 messages (silent)
   const MAX_MESSAGES = 10;
   let messageCount = 0;
-  let countdownInterval = null;
 
   // Add message to UI
-  function addMessageToUI(data, key) {
+  function addMessageToUI(data) {
     const isOwn = data.username === username;
     const displayName = isOwn ? 'You' : data.username;
     const time = new Date(data.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -133,6 +131,7 @@
     const messageDiv = document.createElement('div');
     messageDiv.className = isOwn ? 'flex justify-end' : 'flex items-start';
     messageDiv.setAttribute('data-aos', 'fade-up');
+
     messageDiv.innerHTML = isOwn
       ? `
         <div class="mr-3 text-right">
@@ -163,38 +162,7 @@
 
     messagesList.appendChild(messageDiv);
     AOS.refresh();
-    chatContainer.scrollTop = chatContainer.scrollHeight;
-  }
-
-  // Start countdown and clear ONLY in Firebase
-  function startCountdownAndClear() {
-    if (countdownInterval) return;
-
-    const warningDiv = document.createElement('div');
-    warningDiv.id = 'auto-clear-warning';
-    warningDiv.className = 'text-center text-sm text-red-500 font-medium py-2';
-    warningDiv.textContent = "Deleting messages... You’ll still see them until you refresh the page.";
-    messagesList.appendChild(warningDiv);
-
-    let seconds = 5;
-    const originalText = warningDiv.textContent;
-
-    countdownInterval = setInterval(() => {
-      seconds--;
-      if (seconds > 0) {
-        warningDiv.textContent = `${originalText} (${seconds})`;
-      } else {
-        clearInterval(countdownInterval);
-        countdownInterval = null;
-
-        // ✅ ONLY delete from Firebase — NOT from UI
-        messagesRef.remove()
-          .then(() => console.log('Messages deleted from database'))
-          .catch(err => console.error('Delete failed:', err));
-
-        // Keep warning visible (no removal)
-      }
-    }, 1000);
+    document.getElementById('chat-container').scrollTop = document.getElementById('chat-container').scrollHeight;
   }
 
   // Send message
@@ -216,13 +184,23 @@
     if (e.key === 'Enter') sendMessage();
   });
 
-  // Listen for messages
+  // Listen for new messages
   messagesRef.limitToLast(50).on('child_added', snapshot => {
-    addMessageToUI(snapshot.val(), snapshot.key);
+    addMessageToUI(snapshot.val());
     messageCount++;
 
+    // Silent auto-delete after 10 messages
     if (messageCount >= MAX_MESSAGES) {
-      startCountdownAndClear();
+      messagesRef.remove(); // Only delete from DB — UI stays
+      messageCount = 0; // Reset counter
+    }
+  });
+
+  // Optional: clear UI if someone else clears the DB
+  messagesRef.on('value', snapshot => {
+    if (!snapshot.exists()) {
+      // Don't clear UI — just reset counter
+      messageCount = 0;
     }
   });
 </script>
