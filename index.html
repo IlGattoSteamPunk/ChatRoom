@@ -86,108 +86,156 @@
     </div>
   </div>
 
-  <script>
-    // === STEP 1: Get or set username ===
-    let username = localStorage.getItem('chat-username');
-    if (!username) {
-      username = prompt("Enter your name:") || `User${Math.floor(Math.random() * 1000)}`;
-      localStorage.setItem('chat-username', username);
+<script>
+  // === STEP 1: Get or set username ===
+  let username = localStorage.getItem('chat-username');
+  if (!username) {
+    username = prompt("Enter your name:") || `User${Math.floor(Math.random() * 1000)}`;
+    localStorage.setItem('chat-username', username);
+  }
+
+  // === STEP 2: Firebase config ===
+  const firebaseConfig = {
+    apiKey: "AIzaSyAitQcA61QgbFl_4YEu4-K9wqKnpla853A",
+    authDomain: "antiprivacychatroom.firebaseapp.com",
+    databaseURL: "https://antiprivacychatroom-default-rtdb.europe-west1.firebasedatabase.app",
+    projectId: "antiprivacychatroom",
+    storageBucket: "antiprivacychatroom.firebasestorage.app",
+    messagingSenderId: "419150429129",
+    appId: "1:419150429129:web:20bab378f06ed3028f0618"
+  };
+
+  firebase.initializeApp(firebaseConfig);
+  const database = firebase.database();
+  const messagesRef = database.ref('messages');
+
+  // Initialize icons
+  feather.replace();
+  AOS.init({ duration: 400 });
+
+  // DOM elements
+  const chatContainer = document.getElementById('chat-container');
+  const messagesList = document.getElementById('messages-list');
+  const messageInput = document.getElementById('message-input');
+  const sendButton = document.getElementById('send-button');
+
+  // Auto-delete config
+  const MAX_MESSAGES = 10; // 👈 change this number for testing
+  let messageCount = 0;
+  let countdownInterval = null;
+
+  // Add message to UI
+  function addMessageToUI(data, key) {
+    const isOwn = data.username === username;
+    const displayName = isOwn ? 'You' : data.username;
+    const time = new Date(data.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+    const messageDiv = document.createElement('div');
+    messageDiv.className = isOwn ? 'flex justify-end' : 'flex items-start';
+    messageDiv.setAttribute('data-aos', 'fade-up');
+    messageDiv.innerHTML = isOwn
+      ? `
+        <div class="mr-3 text-right">
+          <div class="flex items-baseline justify-end">
+            <span class="mr-2 text-xs text-gray-500">${time}</span>
+            <h4 class="font-semibold text-gray-800">${displayName}</h4>
+          </div>
+          <div class="mt-1 bg-primary-500 text-white p-3 message-sent">
+            <p>${data.text}</p>
+          </div>
+        </div>
+        <img src="http://static.photos/people/200x200/${Math.floor(Math.random() * 100)}" alt="You" class="w-10 h-10 rounded-full object-cover">
+      `
+      : `
+        <div class="relative">
+          <img src="http://static.photos/people/200x200/${Math.floor(Math.random() * 100)}" alt="${displayName}" class="w-10 h-10 rounded-full object-cover">
+        </div>
+        <div class="ml-3">
+          <div class="flex items-baseline">
+            <h4 class="font-semibold text-gray-800">${displayName}</h4>
+            <span class="ml-2 text-xs text-gray-500">${time}</span>
+          </div>
+          <div class="mt-1 bg-white p-3 message-received shadow-sm">
+            <p class="text-gray-800">${data.text}</p>
+          </div>
+        </div>
+      `;
+
+    messagesList.appendChild(messageDiv);
+    AOS.refresh();
+    chatContainer.scrollTop = chatContainer.scrollHeight;
+  }
+
+  // Start countdown and clear chat
+  function startCountdownAndClear() {
+    if (countdownInterval) return; // prevent multiple timers
+
+    let seconds = 5;
+    const warningDiv = document.createElement('div');
+    warningDiv.id = 'auto-clear-warning';
+    warningDiv.className = 'text-center text-sm text-red-500 font-medium py-2';
+    warningDiv.textContent = `Chat will clear in ${seconds}...`;
+    messagesList.appendChild(warningDiv);
+
+    countdownInterval = setInterval(() => {
+      seconds--;
+      if (seconds > 0) {
+        warningDiv.textContent = `Chat will clear in ${seconds}...`;
+      } else {
+        clearInterval(countdownInterval);
+        countdownInterval = null;
+        // Clear all messages from Firebase
+        messagesRef.remove()
+          .then(() => console.log('Chat cleared'))
+          .catch(err => console.error('Clear failed:', err));
+        warningDiv.remove();
+        messageCount = 0;
+      }
+    }, 1000);
+  }
+
+  // Send message
+  function sendMessage() {
+    const text = messageInput.value.trim();
+    if (text) {
+      messagesRef.push({
+        text: text,
+        username: username,
+        timestamp: firebase.database.ServerValue.TIMESTAMP
+      });
+      messageInput.value = '';
     }
+  }
 
-    // === STEP 2: Firebase config (FIXED: no extra space!) ===
-    const firebaseConfig = {
-      apiKey: "AIzaSyAitQcA61QgbFl_4YEu4-K9wqKnpla853A",
-      authDomain: "antiprivacychatroom.firebaseapp.com",
-      databaseURL: "https://antiprivacychatroom-default-rtdb.europe-west1.firebasedatabase.app", // ✅ no space!
-      projectId: "antiprivacychatroom",
-      storageBucket: "antiprivacychatroom.firebasestorage.app",
-      messagingSenderId: "419150429129",
-      appId: "1:419150429129:web:20bab378f06ed3028f0618"
-    };
+  // Event listeners
+  sendButton.addEventListener('click', sendMessage);
+  messageInput.addEventListener('keypress', e => {
+    if (e.key === 'Enter') sendMessage();
+  });
 
-    // Initialize Firebase
-    firebase.initializeApp(firebaseConfig);
-    const database = firebase.database();
-    const messagesRef = database.ref('messages');
+  // Listen for messages
+  messagesRef.limitToLast(50).on('child_added', snapshot => {
+    addMessageToUI(snapshot.val(), snapshot.key);
+    messageCount++;
 
-    // Initialize icons
-    feather.replace();
-    AOS.init({ duration: 400 });
-
-    // DOM elements
-    const chatContainer = document.getElementById('chat-container');
-    const messagesList = document.getElementById('messages-list');
-    const messageInput = document.getElementById('message-input');
-    const sendButton = document.getElementById('send-button');
-
-    // Add message to UI
-    function addMessageToUI(data, key) {
-      const isOwn = data.username === username;
-      const displayName = isOwn ? 'You' : data.username;
-
-      const messageDiv = document.createElement('div');
-      messageDiv.className = isOwn ? 'flex justify-end' : 'flex items-start';
-      messageDiv.setAttribute('data-aos', 'fade-up');
-
-      const time = new Date(data.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-
-      messageDiv.innerHTML = isOwn
-        ? `
-          <div class="mr-3 text-right">
-            <div class="flex items-baseline justify-end">
-              <span class="mr-2 text-xs text-gray-500">${time}</span>
-              <h4 class="font-semibold text-gray-800">${displayName}</h4>
-            </div>
-            <div class="mt-1 bg-primary-500 text-white p-3 message-sent">
-              <p>${data.text}</p>
-            </div>
-          </div>
-          <img src="http://static.photos/people/200x200/${Math.floor(Math.random() * 100)}" alt="You" class="w-10 h-10 rounded-full object-cover">
-        `
-        : `
-          <div class="relative">
-            <img src="http://static.photos/people/200x200/${Math.floor(Math.random() * 100)}" alt="${displayName}" class="w-10 h-10 rounded-full object-cover">
-          </div>
-          <div class="ml-3">
-            <div class="flex items-baseline">
-              <h4 class="font-semibold text-gray-800">${displayName}</h4>
-              <span class="ml-2 text-xs text-gray-500">${time}</span>
-            </div>
-            <div class="mt-1 bg-white p-3 message-received shadow-sm">
-              <p class="text-gray-800">${data.text}</p>
-            </div>
-          </div>
-        `;
-
-      messagesList.appendChild(messageDiv);
-      AOS.refresh();
-      chatContainer.scrollTop = chatContainer.scrollHeight;
+    if (messageCount >= MAX_MESSAGES) {
+      startCountdownAndClear();
     }
+  });
 
-    // Send message
-    function sendMessage() {
-      const text = messageInput.value.trim();
-      if (text) {
-        messagesRef.push({
-          text: text,
-          username: username,
-          timestamp: firebase.database.ServerValue.TIMESTAMP
-        });
-        messageInput.value = '';
+  // Reset count when messages are cleared
+  messagesRef.on('value', snapshot => {
+    if (snapshot.exists() === false) {
+      messagesList.innerHTML = '';
+      messageCount = 0;
+      if (countdownInterval) {
+        clearInterval(countdownInterval);
+        countdownInterval = null;
+        const warning = document.getElementById('auto-clear-warning');
+        if (warning) warning.remove();
       }
     }
-
-    // Event listeners
-    sendButton.addEventListener('click', sendMessage);
-    messageInput.addEventListener('keypress', e => {
-      if (e.key === 'Enter') sendMessage();
-    });
-
-    // Listen for new messages
-    messagesRef.limitToLast(50).on('child_added', snapshot => {
-      const data = snapshot.val();
-      addMessageToUI(data, snapshot.key);
-    });
-  </script>
+  });
+</script>
 </body>
 </html>
