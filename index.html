@@ -120,7 +120,7 @@
   const sendButton = document.getElementById('send-button');
 
   // Auto-delete config
-  const MAX_MESSAGES = 10; // 👈 change this number for testing
+  const MAX_MESSAGES = 10;
   let messageCount = 0;
   let countdownInterval = null;
 
@@ -166,30 +166,33 @@
     chatContainer.scrollTop = chatContainer.scrollHeight;
   }
 
-  // Start countdown and clear chat
+  // Start countdown and clear ONLY in Firebase
   function startCountdownAndClear() {
-    if (countdownInterval) return; // prevent multiple timers
+    if (countdownInterval) return;
 
-    let seconds = 5;
     const warningDiv = document.createElement('div');
     warningDiv.id = 'auto-clear-warning';
     warningDiv.className = 'text-center text-sm text-red-500 font-medium py-2';
-    warningDiv.textContent = `Chat will clear in ${seconds}...`;
+    warningDiv.textContent = "Deleting messages... You’ll still see them until you refresh the page.";
     messagesList.appendChild(warningDiv);
+
+    let seconds = 5;
+    const originalText = warningDiv.textContent;
 
     countdownInterval = setInterval(() => {
       seconds--;
       if (seconds > 0) {
-        warningDiv.textContent = `Chat will clear in ${seconds}...`;
+        warningDiv.textContent = `${originalText} (${seconds})`;
       } else {
         clearInterval(countdownInterval);
         countdownInterval = null;
-        // Clear all messages from Firebase
+
+        // ✅ ONLY delete from Firebase — NOT from UI
         messagesRef.remove()
-          .then(() => console.log('Chat cleared'))
-          .catch(err => console.error('Clear failed:', err));
-        warningDiv.remove();
-        messageCount = 0;
+          .then(() => console.log('Messages deleted from database'))
+          .catch(err => console.error('Delete failed:', err));
+
+        // Keep warning visible (no removal)
       }
     }, 1000);
   }
@@ -220,20 +223,6 @@
 
     if (messageCount >= MAX_MESSAGES) {
       startCountdownAndClear();
-    }
-  });
-
-  // Reset count when messages are cleared
-  messagesRef.on('value', snapshot => {
-    if (snapshot.exists() === false) {
-      messagesList.innerHTML = '';
-      messageCount = 0;
-      if (countdownInterval) {
-        clearInterval(countdownInterval);
-        countdownInterval = null;
-        const warning = document.getElementById('auto-clear-warning');
-        if (warning) warning.remove();
-      }
     }
   });
 </script>
